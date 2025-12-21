@@ -69,6 +69,7 @@ class E2271KS0C1 : public display::DisplayBuffer {
 
   uint8_t *cur_{nullptr};
   uint8_t *prev_{nullptr};
+  uint8_t *zero_{nullptr};  // Zero buffer for Frame 2 in full updates
 
   bool sync_needed_{true};
   uint32_t frame_count_{0};

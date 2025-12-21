@@ -29,6 +29,10 @@ E2271KS0C1::~E2271KS0C1() {
     heap_caps_free(prev_);
     prev_ = nullptr;
   }
+  if (zero_ != nullptr) {
+    heap_caps_free(zero_);
+    zero_ = nullptr;
+  }
   if (buf_ != nullptr) {
     delete[] buf_;
     buf_ = nullptr;
@@ -50,12 +54,14 @@ void E2271KS0C1::setup() {
   // --- DMA buffers for SPI transfers ---
   cur_ = (uint8_t *) heap_caps_malloc(BYTES, MALLOC_CAP_DMA);
   prev_ = (uint8_t *) heap_caps_malloc(BYTES, MALLOC_CAP_DMA);
-  if (cur_ == nullptr || prev_ == nullptr) {
+  zero_ = (uint8_t *) heap_caps_malloc(BYTES, MALLOC_CAP_DMA);
+  if (cur_ == nullptr || prev_ == nullptr || zero_ == nullptr) {
     ESP_LOGE(TAG, "Failed to allocate DMA buffers (BYTES=%d)", BYTES);
     return;
   }
   std::memset(cur_, WHITE_FILL, BYTES);
   std::memset(prev_, WHITE_FILL, BYTES);
+  std::memset(zero_, 0x00, BYTES);
 
   if (dc_pin_ == nullptr || rst_pin_ == nullptr || busy_pin_ == nullptr) {
     ESP_LOGE(TAG, "Pins not set (dc/rst/busy null)");
@@ -347,11 +353,9 @@ void E2271KS0C1::send_image_full_() {
   send_cmd_(ADDR_FRAME1, nullptr, 0);
   send_frame_(cur_);
 
-  // Frame 2: zeros
+  // Frame 2: zeros (use pre-allocated zero buffer for speed)
   send_cmd_(ADDR_FRAME2, nullptr, 0);
-  for (int i = 0; i < BYTES; i++) {
-    send_data_byte_(0x00);
-  }
+  send_frame_(zero_);
 
   std::memcpy(prev_, cur_, BYTES);
 }
