@@ -116,7 +116,7 @@ display:
     data_rate: 4MHz
     rotation: 0
     update_interval: 10s
-    full_update_every: 6   # Full refresh every 6 updates (1 min) to clear ghosting
+    full_update_every: 100   # Full refresh every 100 updates (16 min) to clear ghosting
     temperature_c: 25
 
     lambda: |-

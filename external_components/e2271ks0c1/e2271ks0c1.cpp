@@ -59,10 +59,12 @@ bool E2271KS0C1::transfer_data() {
     this->initialized_ = true;
   }
 
-  // Soft reset with data (critical for this panel)
-  uint8_t reset_data = 0x0E;
-  this->cmd_data(0x00, &reset_data, 1);
-  delay(50);
+  // Soft reset only on full updates (causes flash if done every time)
+  if (full_update) {
+    uint8_t reset_data = 0x0E;
+    this->cmd_data(0x00, &reset_data, 1);
+    delay(50);
+  }
 
   // Build TX buffer with 90-degree clockwise rotation
   // Source buffer: 264 wide x 176 tall (as reported to ESPHome)
@@ -142,14 +144,11 @@ bool E2271KS0C1::transfer_data() {
   this->wait_for_idle_(true);
 
   this->command(ADDR_PWR_ON);
-  this->command(ADDR_PWR_ON);
   this->wait_for_idle_(true);
 
   this->command(ADDR_REFRESH);
-  this->command(ADDR_REFRESH);
   this->wait_for_idle_(true);
 
-  this->command(ADDR_PWR_OFF);
   this->command(ADDR_PWR_OFF);
   this->wait_for_idle_(true);
 
