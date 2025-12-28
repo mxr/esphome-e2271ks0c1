@@ -42,8 +42,8 @@ bool E2271KS0C1::transfer_data() {
   const bool fast = !full_update;
   ESP_LOGD(TAG, "Update mode: %s (count=%u, full_every=%u)", fast ? "FAST" : "FULL", this->update_count_, this->full_update_every_);
 
-  // Hardware reset on first call, and optionally on full updates to clear ghosting
-  if (!this->initialized_ || full_update) {
+  // Hardware reset on first call only
+  if (!this->initialized_) {
     if (this->reset_pin_ != nullptr) {
       ESP_LOGD(TAG, "Hardware reset sequence");
       this->reset_pin_->digital_write(false);

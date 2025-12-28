@@ -1,3 +1,8 @@
+substitutions:
+  dark_mode: "true"
+  time_24h: "false"
+  temp_fahrenheit: "true"
+
 esphome:
   name: bitclock
   friendly_name: Bitclock
@@ -119,66 +124,81 @@ display:
       int w = it.get_width();
       int h = it.get_height();
 
-      // Clear to white
-      it.fill(COLOR_OFF);
+      // Dark mode: swap foreground and background
+      bool dark = ${dark_mode};
+      auto fg = dark ? COLOR_OFF : COLOR_ON;
+      auto bg = dark ? COLOR_ON : COLOR_OFF;
+
+      // Clear to background color
+      it.fill(bg);
 
       // --- Top bar: Time (left) and WiFi (right) ---
       auto time = id(homeassistant_time).now();
       if (time.is_valid()) {
-        it.strftime(8, 6, id(font_time), COLOR_ON, "%H:%M", time);
+        if (${time_24h}) {
+          it.strftime(8, 6, id(font_time), fg, "%H:%M", time);
+        } else {
+          it.strftime(8, 6, id(font_time), fg, "%l:%M%P", time);
+        }
       } else {
-        it.print(8, 6, id(font_time), COLOR_ON, "--:--");
+        it.print(8, 6, id(font_time), fg, "--:--");
       }
 
       // WiFi status icon (top right)
       if (wifi::global_wifi_component->is_connected()) {
-        it.print(w - 28, 8, id(font_icons), COLOR_ON, "\U000F05A9");  // wifi
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F05A9");  // wifi
       } else {
-        it.print(w - 28, 8, id(font_icons), COLOR_ON, "\U000F05AA");  // wifi-off
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F05AA");  // wifi-off
       }
 
       // --- Divider line ---
-      it.line(0, 42, w, 42, COLOR_ON);
+      it.line(0, 42, w, 42, fg);
 
       // --- Sensor readings in 2x2 grid ---
       int col1 = 12;
       int col2 = w / 2 + 6;
       int row1 = 54;
-      int row2 = 116;
-      int icon_offset = 0;
+      int row2 = 110;
       int text_offset = 28;
-      int value_offset = 14;
+      int value_offset = 18;
+      int icon_y_offset = -5;  // Move icons up to align top with label
 
       // CO2 (top left)
-      it.print(col1 + icon_offset, row1, id(font_icons), COLOR_ON, "\U000F07E4");  // molecule-co2
-      it.print(col1 + text_offset, row1, id(font_label), COLOR_ON, "CO2");
+      it.print(col1, row1 + icon_y_offset, id(font_icons), fg, "\U000F07E4");  // molecule-co2
+      it.print(col1 + text_offset, row1, id(font_label), fg, "CO2");
       if (!isnan(id(co2).state)) {
-        it.printf(col1 + text_offset, row1 + value_offset, id(font_value), COLOR_ON, "%.0f", id(co2).state);
-        it.print(col1 + text_offset + 60, row1 + value_offset + 6, id(font_unit), COLOR_ON, "ppm");
+        it.printf(col1, row1 + value_offset, id(font_value), fg, "%.0f ppm", id(co2).state);
+      } else {
+        it.print(col1, row1 + value_offset, id(font_value), fg, "--");
       }
 
       // Temperature (top right)
-      it.print(col2 + icon_offset, row1, id(font_icons), COLOR_ON, "\U000F050F");  // thermometer
-      it.print(col2 + text_offset, row1, id(font_label), COLOR_ON, "TEMP");
+      it.print(col2, row1 + icon_y_offset, id(font_icons), fg, "\U000F050F");  // thermometer
+      it.print(col2 + text_offset, row1, id(font_label), fg, "TEMP");
       if (!isnan(id(temperature).state)) {
-        it.printf(col2 + text_offset, row1 + value_offset, id(font_value), COLOR_ON, "%.1f", id(temperature).state);
-        it.print(col2 + text_offset + 52, row1 + value_offset + 6, id(font_unit), COLOR_ON, "°C");
+        bool use_f = ${temp_fahrenheit};
+        float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
+        it.printf(col2, row1 + value_offset, id(font_value), fg, use_f ? "%.1f °F" : "%.1f °C", temp);
+      } else {
+        it.print(col2, row1 + value_offset, id(font_value), fg, "--");
       }
 
       // Humidity (bottom left)
-      it.print(col1 + icon_offset, row2, id(font_icons), COLOR_ON, "\U000F058E");  // water-percent
-      it.print(col1 + text_offset, row2, id(font_label), COLOR_ON, "HUMID");
+      it.print(col1, row2 + icon_y_offset, id(font_icons), fg, "\U000F058E");  // water-percent
+      it.print(col1 + text_offset, row2, id(font_label), fg, "HUMIDITY");
       if (!isnan(id(humidity).state)) {
-        it.printf(col1 + text_offset, row2 + value_offset, id(font_value), COLOR_ON, "%.0f", id(humidity).state);
-        it.print(col1 + text_offset + 44, row2 + value_offset + 6, id(font_unit), COLOR_ON, "%");
+        it.printf(col1, row2 + value_offset, id(font_value), fg, "%.0f %%", id(humidity).state);
+      } else {
+        it.print(col1, row2 + value_offset, id(font_value), fg, "--");
       }
 
       // VOC (bottom right)
-      it.print(col2 + icon_offset, row2, id(font_icons), COLOR_ON, "\U000F1438");  // air-filter
-      it.print(col2 + text_offset, row2, id(font_label), COLOR_ON, "VOC");
+      it.print(col2, row2 + icon_y_offset, id(font_icons), fg, "\U000F0D43");  // air-purifier
+      it.print(col2 + text_offset, row2, id(font_label), fg, "VOC");
       if (!isnan(id(voc).state)) {
-        it.printf(col2 + text_offset, row2 + value_offset, id(font_value), COLOR_ON, "%.0f", id(voc).state);
-        it.print(col2 + text_offset + 44, row2 + value_offset + 6, id(font_unit), COLOR_ON, "idx");
+        it.printf(col2, row2 + value_offset, id(font_value), fg, "%.0f idx", id(voc).state);
+      } else {
+        it.print(col2, row2 + value_offset, id(font_value), fg, "--");
       }
 
 # -------------------
@@ -190,25 +210,19 @@ font:
   - file: "gfonts://Roboto@700"
     id: font_time
     size: 32
-    glyphs: "0123456789:-"
+    glyphs: "0123456789:- amp"
 
-  # Value display - large numbers
+  # Value display - numbers and units
   - file: "gfonts://Roboto@500"
     id: font_value
-    size: 28
-    glyphs: "0123456789.-"
+    size: 24
+    glyphs: "0123456789.- pm°CFidx%"
 
   # Labels
   - file: "gfonts://Roboto@500"
     id: font_label
     size: 14
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
-
-  # Units
-  - file: "gfonts://Roboto@400"
-    id: font_unit
-    size: 14
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/ °"
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 /"
 
   # Material Design Icons
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
@@ -220,4 +234,4 @@ font:
       - "\U000F07E4"  # mdi:molecule-co2
       - "\U000F050F"  # mdi:thermometer
       - "\U000F058E"  # mdi:water-percent
-      - "\U000F1438"  # mdi:air-filter
+      - "\U000F0D43"  # mdi:air-purifier
