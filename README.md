@@ -44,7 +44,10 @@ See [bitclock.example.yaml](https://github.com/gxlabs/esphome-e2271ks0c1/blob/ma
 - Material Design Icons
 - Dark mode toggle
 
-<img src="https://github.com/user-attachments/assets/4aace8f3-e9bc-49de-a069-bb6bac813f6b" width=450 />
+|Literal screen shot|ESPHome sensors|
+|-|-|
+|<img src="https://github.com/user-attachments/assets/4aace8f3-e9bc-49de-a069-bb6bac813f6b" width=450 />|<img src="https://github.com/user-attachments/assets/e64ea655-753f-4cdb-8789-05af215b124a" width=450 />|
+
 
 ### Substitutions
 
