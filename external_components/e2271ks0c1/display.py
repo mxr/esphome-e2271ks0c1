@@ -1,60 +1,73 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
-from esphome.components import display
+from esphome.components import display, spi
 from esphome.const import (
     CONF_BUSY_PIN,
-    CONF_CS_PIN,
     CONF_DC_PIN,
+    CONF_FULL_UPDATE_EVERY,
     CONF_ID,
+    CONF_LAMBDA,
     CONF_RESET_PIN,
-    CONF_UPDATE_INTERVAL,
 )
+from esphome.cpp_generator import RawExpression  # <-- add this
 
-e2271_ns = cg.esphome_ns.namespace("e2271ks0c1")
-E2271KS0C1 = e2271_ns.class_("E2271KS0C1", display.DisplayBuffer)
+DEPENDENCIES = ["spi"]
+AUTO_LOAD = ["epaper_spi", "spi", "split_buffer"]
 
-CONF_CLK_PIN = "clk_pin"
-CONF_MOSI_PIN = "mosi_pin"
-CONF_SPI_HOST = "spi_host"
-CONF_OTP_CLOCK_HZ = "otp_clock_hz"
-CONF_WRITE_CLOCK_HZ = "write_clock_hz"
-CONF_FULL_UPDATE_EVERY = "full_update_every"
 CONF_TEMPERATURE_C = "temperature_c"
 
-CONFIG_SCHEMA = display.FULL_DISPLAY_SCHEMA.extend(
-    {
-        cv.GenerateID(): cv.declare_id(E2271KS0C1),
-        cv.Required(CONF_CLK_PIN): cv.int_,
-        cv.Required(CONF_MOSI_PIN): cv.int_,
-        cv.Required(CONF_CS_PIN): cv.int_,
-        cv.Required(CONF_DC_PIN): pins.gpio_output_pin_schema,
-        cv.Required(CONF_RESET_PIN): pins.gpio_output_pin_schema,
-        cv.Required(CONF_BUSY_PIN): pins.gpio_input_pin_schema,
-        cv.Optional(CONF_SPI_HOST, default="SPI2_HOST"): cv.one_of("SPI2_HOST", "SPI3_HOST", upper=True),
-        cv.Optional(CONF_OTP_CLOCK_HZ, default=4_000_000): cv.int_range(min=100_000, max=10_000_000),
-        cv.Optional(CONF_WRITE_CLOCK_HZ, default=10_000_000): cv.int_range(min=100_000, max=20_000_000),
-        cv.Optional(CONF_FULL_UPDATE_EVERY, default=120): cv.int_range(min=1, max=10000),
-        cv.Optional(CONF_TEMPERATURE_C, default=25.0): cv.float_,
-        cv.Optional(CONF_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
-    }
+e2271_ns = cg.esphome_ns.namespace("e2271ks0c1")
+epaper_spi_ns = cg.esphome_ns.namespace("epaper_spi")
+
+EPaperBase = epaper_spi_ns.class_(
+    "EPaperBase", cg.PollingComponent, spi.SPIDevice, display.Display
+)
+E2271KS0C1 = e2271_ns.class_("E2271KS0C1", EPaperBase)
+
+CONFIG_SCHEMA = (
+    display.FULL_DISPLAY_SCHEMA.extend(
+        spi.spi_device_schema(
+            default_mode="MODE0",
+            default_data_rate=4_000_000,
+        )
+    )
+    .extend(
+        {
+            cv.GenerateID(): cv.declare_id(E2271KS0C1),
+            cv.Required(CONF_DC_PIN): pins.gpio_output_pin_schema,
+            cv.Required(CONF_RESET_PIN): pins.gpio_output_pin_schema,
+            cv.Required(CONF_BUSY_PIN): pins.gpio_input_pin_schema,
+            cv.Optional(CONF_FULL_UPDATE_EVERY, default=30): cv.int_range(1, 255),
+            cv.Optional(CONF_TEMPERATURE_C, default=25.0): cv.float_,
+        }
+    )
 )
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
+    # ctor signature: (const char* name, int width, int height, const uint8_t* init, size_t init_len)
+    var = cg.new_Pvariable(
+        config[CONF_ID],
+        "E2271KS0C1",
+        264,  # swap: panel is 264 wide in native orientation
+        176,  # swap: panel is 176 tall in native orientation
+        RawExpression("nullptr"),
+        0,
+    )
 
-    # IMPORTANT: register_display already registers the component
     await display.register_display(var, config)
+    await spi.register_spi_device(var, config)
 
-    cg.add(var.set_clk_pin(config[CONF_CLK_PIN]))
-    cg.add(var.set_mosi_pin(config[CONF_MOSI_PIN]))
-    cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
     cg.add(var.set_dc_pin(await cg.gpio_pin_expression(config[CONF_DC_PIN])))
     cg.add(var.set_reset_pin(await cg.gpio_pin_expression(config[CONF_RESET_PIN])))
     cg.add(var.set_busy_pin(await cg.gpio_pin_expression(config[CONF_BUSY_PIN])))
 
-    cg.add(var.set_spi_host(config[CONF_SPI_HOST]))
-    cg.add(var.set_otp_clock_hz(config[CONF_OTP_CLOCK_HZ]))
-    cg.add(var.set_write_clock_hz(config[CONF_WRITE_CLOCK_HZ]))
     cg.add(var.set_full_update_every(config[CONF_FULL_UPDATE_EVERY]))
     cg.add(var.set_temperature_c(config[CONF_TEMPERATURE_C]))
+
+    # Explicitly handle the display lambda
+    if CONF_LAMBDA in config:
+        lambda_ = await cg.process_lambda(
+            config[CONF_LAMBDA], [(display.DisplayRef, "it")], return_type=cg.void
+        )
+        cg.add(var.set_writer(lambda_))
