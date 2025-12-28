@@ -36,12 +36,14 @@ bool E2271KS0C1::transfer_data() {
   ESP_LOGI(TAG, "Buffer has %zu non-zero bytes (shapes drawn)", non_zero);
 
   // Determine if this is a fast (partial) update or full update
-  // Full update on first frame and every full_update_every frames
-  const bool fast = (this->update_count_ != 0);
-  ESP_LOGD(TAG, "Update mode: %s (count=%u)", fast ? "FAST" : "FULL", this->update_count_);
+  // Full update on first frame and every full_update_every_ frames
+  const bool full_update = (this->update_count_ == 0) ||
+                           (this->full_update_every_ > 0 && (this->update_count_ % this->full_update_every_) == 0);
+  const bool fast = !full_update;
+  ESP_LOGD(TAG, "Update mode: %s (count=%u, full_every=%u)", fast ? "FAST" : "FULL", this->update_count_, this->full_update_every_);
 
-  // Hardware reset sequence on first call only
-  if (!this->initialized_) {
+  // Hardware reset on first call, and optionally on full updates to clear ghosting
+  if (!this->initialized_ || full_update) {
     if (this->reset_pin_ != nullptr) {
       ESP_LOGD(TAG, "Hardware reset sequence");
       this->reset_pin_->digital_write(false);
@@ -151,8 +153,13 @@ bool E2271KS0C1::transfer_data() {
   this->command(ADDR_PWR_OFF);
   this->wait_for_idle_(true);
 
-  // Store for potential fast mode later
+  // Store current frame for next fast update comparison
+  // After a full update, prev_ should match what's on screen
   this->prev_ = this->tx_;
+
+  // Increment update counter
+  this->update_count_++;
+
   ESP_LOGD(TAG, "Display update complete");
   return true;
 }
