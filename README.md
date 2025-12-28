@@ -70,6 +70,10 @@ This driver is designed for the Pervasive Displays E2271KS0C1 panel with the fol
 | I2C SDA | GPIO8 |
 | I2C SCL | GPIO9 |
 
+## Credits
+
+The example configuration (`bitclock.example.yaml`) extends from [manedfolf/bitclock](https://github.com/manedfolf/bitclock/blob/esphome/bitclock-esphome/bitclock-esphome.yaml) ESPHome configuration.
+
 ## License
 
 MIT
