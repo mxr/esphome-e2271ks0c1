@@ -35,14 +35,16 @@ Replace `your-homeassistant.local` with your Home Assistant hostname or IP addre
 | `full_update_every` | 30 | Full refresh every N updates (clears ghosting) |
 | `temperature_c` | 25 | Ambient temperature for waveform timing |
 
-## Example Configuration
+## Bitclock Example Configuration
 
-See `bitclock.example.yaml` for a complete example with:
+See [bitclock.example.yaml](https://github.com/gxlabs/esphome-e2271ks0c1/blob/main/bitclock.example.yaml) for a complete example with:
 - Time display (12h/24h configurable)
 - WiFi status icon
 - CO2, temperature, humidity, and VOC sensor readings
 - Material Design Icons
 - Dark mode toggle
+
+<img src="https://github.com/user-attachments/assets/4aace8f3-e9bc-49de-a069-bb6bac813f6b" width=450 />
 
 ### Substitutions
 
@@ -72,7 +74,7 @@ This driver is designed for the Pervasive Displays E2271KS0C1 panel with the fol
 
 ## Credits
 
-The example configuration (`bitclock.example.yaml`) extends from [manedfolf/bitclock](https://github.com/manedfolf/bitclock/blob/esphome/bitclock-esphome/bitclock-esphome.yaml) ESPHome configuration.
+The example configuration ([bitclock.example.yaml](https://github.com/gxlabs/esphome-e2271ks0c1/blob/main/bitclock.example.yaml)) extends from [manedfolf/bitclock](https://github.com/manedfolf/bitclock/blob/esphome/bitclock-esphome/bitclock-esphome.yaml) ESPHome configuration.
 
 ## License
 
