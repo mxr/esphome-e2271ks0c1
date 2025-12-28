@@ -1,6 +1,6 @@
 # ESPHome E2271KS0C1 E-Paper Display Driver
 
-ESPHome external component for the Pervasive Displays E2271KS0C1 2.7" e-paper display (176x264 pixels), as used in the Bitclock project.
+ESPHome external component for the [Pervasive Displays E2271KS0C1 2.7" e-paper display](https://www.pervasivedisplays.com/product/2-71-e-ink-displays/#wide-temperature-fast-refresh) (176x264 pixels), as used in the [Bitclock](https://github.com/goat-hill/bitclock) project.
 
 ## Features
 
