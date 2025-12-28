@@ -17,7 +17,7 @@ static inline uint8_t encode_temp_tsset(float temp_c, bool fast) {
 bool E2271KS0C1::transfer_data() {
   ESP_LOGD(TAG, "transfer_data() starting");
 
-  // Clear to black, then let the writer (lambda) draw
+  // Clear to white, then let the writer (lambda) draw
   this->fill(display::COLOR_OFF);
 
   // Try to call the display writer/lambda directly
