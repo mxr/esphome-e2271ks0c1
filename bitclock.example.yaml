@@ -1,14 +1,13 @@
-substitutions:
-  dark_mode: "true"
-  time_24h: "false"
-  temp_fahrenheit: "true"
-
 esphome:
   name: bitclock
   friendly_name: Bitclock
   platformio_options:
     build_flags:
       - -DESPHOME_USE_ESP_IDF
+  on_boot:
+    priority: -100  # Run after WiFi component starts
+    then:
+      - script.execute: wifi_setup_check
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -24,21 +23,147 @@ logger:
   logs:
     e2271ks0c1: DEBUG
 
-# Home Assistant API (remove if using standalone ESPHome)
+# Home Assistant API (comment out if using standalone ESPHome)
 api:
 
 ota:
   - platform: esphome
 
+# -------------------
+# Web Server for configuration
+# -------------------
+
+web_server:
+  port: 80
+
+# -------------------
+# Persistent settings (survives reboot)
+# -------------------
+
+globals:
+  - id: dark_mode
+    type: bool
+    restore_value: true
+    initial_value: 'true'
+  - id: temp_fahrenheit
+    type: bool
+    restore_value: true
+    initial_value: 'true'
+  - id: time_24h
+    type: bool
+    restore_value: true
+    initial_value: 'false'
+  - id: show_setup_screen
+    type: bool
+    initial_value: 'false'
+
+# -------------------
+# WiFi setup screen logic
+#   Shows QR code only after WiFi fails to connect (not during initial boot)
+# -------------------
+
+script:
+  - id: wifi_setup_check
+    mode: restart
+    then:
+      - delay: 15s  # Wait for WiFi connection attempt
+      - if:
+          condition:
+            not:
+              wifi.connected:
+          then:
+            - globals.set:
+                id: show_setup_screen
+                value: 'true'
+            - component.update: epd
+
+# -------------------
+# Settings switches (exposed in web UI and Home Assistant)
+# -------------------
+
+switch:
+  - platform: template
+    name: "Dark Mode"
+    id: dark_mode_switch
+    icon: "mdi:theme-light-dark"
+    lambda: 'return id(dark_mode);'
+    turn_on_action:
+      - globals.set:
+          id: dark_mode
+          value: 'true'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+    turn_off_action:
+      - globals.set:
+          id: dark_mode
+          value: 'false'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+
+  - platform: template
+    name: "Temperature in Fahrenheit"
+    id: temp_f_switch
+    icon: "mdi:thermometer"
+    lambda: 'return id(temp_fahrenheit);'
+    turn_on_action:
+      - globals.set:
+          id: temp_fahrenheit
+          value: 'true'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+    turn_off_action:
+      - globals.set:
+          id: temp_fahrenheit
+          value: 'false'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+
+  - platform: template
+    name: "24-Hour Time"
+    id: time_24h_switch
+    icon: "mdi:clock-outline"
+    lambda: 'return id(time_24h);'
+    turn_on_action:
+      - globals.set:
+          id: time_24h
+          value: 'true'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+    turn_off_action:
+      - globals.set:
+          id: time_24h
+          value: 'false'
+      - lambda: 'id(epd).force_full_update();'
+      - component.update: epd
+
+# -------------------
+# WiFi with captive portal
+# -------------------
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
+  on_connect:
+    - script.stop: wifi_setup_check
+    - globals.set:
+        id: show_setup_screen
+        value: 'false'
+    - component.update: epd
+
+  on_disconnect:
+    - script.execute: wifi_setup_check
+
   ap:
-    ssid: "Bitclock Fallback Hotspot"
-    password: "bitclock"
+    ssid: "Bitclock Setup"
+    password: "bitclock123"
 
 captive_portal:
+
+# QR code for WiFi setup (scan to connect to AP)
+qr_code:
+  - id: wifi_qr
+    value: "WIFI:T:WPA;S:Bitclock Setup;P:bitclock123;;"
 
 # -------------------
 # Time
@@ -96,8 +221,8 @@ sensor:
 
 # -------------------
 # External E-Ink Driver
-#   Home Assistant: Copy external_components folder to /config/esphome/ and use local path (default below)
-#   Standalone: Comment out local source and uncomment git source
+#   Home Assistant: Copy components folder to /config/esphome/ and use local path
+#   Standalone: Use git source
 # -------------------
 
 external_components:
@@ -139,8 +264,27 @@ display:
       int w = it.get_width();
       int h = it.get_height();
 
-      // Dark mode: swap foreground and background
-      bool dark = ${dark_mode};
+      // --- WiFi Setup Screen (shown after WiFi fails to connect) ---
+      if (id(show_setup_screen)) {
+        it.fill(COLOR_OFF);
+
+        // Title
+        it.printf(w / 2, 8, id(font_label), COLOR_ON, TextAlign::TOP_CENTER, "WIFI SETUP");
+
+        // QR code centered (scale=2 makes it ~66px)
+        id(wifi_qr).draw(&it, (w - 66) / 2, 28, COLOR_ON, 2);
+
+        // Instructions
+        it.printf(w / 2, 100, id(font_label), COLOR_ON, TextAlign::TOP_CENTER, "SCAN QR OR CONNECT TO:");
+        it.printf(w / 2, 118, id(font_value), COLOR_ON, TextAlign::TOP_CENTER, "Bitclock Setup");
+        it.printf(w / 2, 144, id(font_label), COLOR_ON, TextAlign::TOP_CENTER, "PASSWORD: bitclock123");
+        it.printf(w / 2, 162, id(font_label), COLOR_ON, TextAlign::TOP_CENTER, "THEN VISIT 192.168.4.1");
+
+        return;  // Skip normal display
+      }
+
+      // --- Normal Display ---
+      bool dark = id(dark_mode);
       auto fg = dark ? COLOR_OFF : COLOR_ON;
       auto bg = dark ? COLOR_ON : COLOR_OFF;
 
@@ -150,7 +294,7 @@ display:
       // --- Top bar: Time (left) and WiFi (right) ---
       auto time = id(current_time).now();
       if (time.is_valid()) {
-        if (${time_24h}) {
+        if (id(time_24h)) {
           it.strftime(8, 6, id(font_time), fg, "%H:%M", time);
         } else {
           it.strftime(8, 6, id(font_time), fg, "%l:%M%P", time);
@@ -160,19 +304,15 @@ display:
       }
 
       // WiFi strength icon (top right)
-      if (wifi::global_wifi_component->is_connected()) {
-        float rssi = id(wifi_signal_db).state;
-        if (rssi >= -50) {
-          it.print(w - 28, 8, id(font_icons), fg, "\U000F0928");  // wifi-strength-4
-        } else if (rssi >= -60) {
-          it.print(w - 28, 8, id(font_icons), fg, "\U000F0925");  // wifi-strength-3
-        } else if (rssi >= -70) {
-          it.print(w - 28, 8, id(font_icons), fg, "\U000F0922");  // wifi-strength-2
-        } else {
-          it.print(w - 28, 8, id(font_icons), fg, "\U000F091F");  // wifi-strength-1
-        }
+      float rssi = id(wifi_signal_db).state;
+      if (rssi >= -50) {
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F0928");  // wifi-strength-4
+      } else if (rssi >= -60) {
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F0925");  // wifi-strength-3
+      } else if (rssi >= -70) {
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F0922");  // wifi-strength-2
       } else {
-        it.print(w - 28, 8, id(font_icons), fg, "\U000F092B");  // wifi-strength-off
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F091F");  // wifi-strength-1
       }
 
       // --- Divider line ---
@@ -201,9 +341,9 @@ display:
       it.print(col2, row1 + icon_y_offset, id(font_icons), fg, "\U000F050F");  // thermometer
       it.print(col2 + text_offset, row1, id(font_label), fg, "TEMP");
       if (!isnan(id(temperature).state)) {
-        bool use_f = ${temp_fahrenheit};
+        bool use_f = id(temp_fahrenheit);
         float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
-        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.1f °F" : "%.1f °C", temp);
+        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.1f F" : "%.1f C", temp);
       } else {
         it.print(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
@@ -241,13 +381,13 @@ font:
   - file: "gfonts://Roboto@500"
     id: font_value
     size: 24
-    glyphs: "0123456789.- pm°CFidx%"
+    glyphs: "0123456789.- %CFABcdefghijklmnopqrstuvwxyz"
 
   # Labels
   - file: "gfonts://Roboto@500"
     id: font_label
     size: 14
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 /"
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /:."
 
   # Material Design Icons
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
