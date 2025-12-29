@@ -101,11 +101,13 @@ sensor:
 # -------------------
 
 external_components:
+  # Home Assistant Add-on: use local path
   - source:
       type: local
       path: /config/esphome/external_components
     components: [ e2271ks0c1 ]
 
+  # Standalone ESPHome: use git source (comment out local above, uncomment below)
   # - source:
   #     type: git
   #     url: https://github.com/gxlabs/esphome-e2271ks0c1
