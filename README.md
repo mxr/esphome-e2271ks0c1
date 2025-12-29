@@ -9,18 +9,100 @@ ESPHome external component for the [Pervasive Displays E2271KS0C1 2.7" e-paper d
 - Dark mode support (inverted colors)
 - 12h/24h time format
 - Celsius/Fahrenheit temperature display
+- WiFi signal strength indicator
 
 ## Installation
 
-1. Copy the external component to your ESPHome configuration directory:
+Choose the installation method based on your setup:
 
-```bash
-scp -r external_components your-homeassistant.local:/config/esphome/
-```
+### Option A: Home Assistant ESPHome Add-on
 
-Replace `your-homeassistant.local` with your Home Assistant hostname or IP address.
+Use this method if you're running ESPHome as a Home Assistant add-on.
 
-2. Create a new ESPHome configuration based on `bitclock.example.yaml`
+1. **Install the ESPHome add-on**
+
+   In Home Assistant, go to Settings > Add-ons > Add-on Store and install "ESPHome".
+
+2. **Copy the external component to Home Assistant**
+
+   Copy the `external_components` folder to your Home Assistant config directory:
+
+   ```bash
+   scp -r external_components your-homeassistant.local:/config/esphome/
+   ```
+
+   Replace `your-homeassistant.local` with your Home Assistant hostname or IP address.
+
+3. **Create your configuration**
+
+   In the ESPHome dashboard, create a new device and use `bitclock.example.yaml` as a reference. The example is pre-configured for Home Assistant.
+
+4. **Add WiFi credentials**
+
+   Add your WiFi credentials to the ESPHome secrets (accessible from the ESPHome dashboard).
+
+5. **Install to device**
+
+   Click "Install" in the ESPHome dashboard to compile and upload to your device.
+
+### Option B: Standalone ESPHome (CLI)
+
+Use this method if you're running ESPHome directly on your computer without Home Assistant.
+
+1. **Install ESPHome CLI**
+
+   ```bash
+   pip install esphome
+   ```
+
+2. **Create your configuration**
+
+   Copy `bitclock.example.yaml` to your project directory and rename it (e.g., `bitclock.yaml`).
+
+3. **Modify for standalone use**
+
+   Make the following changes in your YAML file:
+
+   - **Time source**: Comment out the `homeassistant` platform and uncomment the `sntp` platform:
+     ```yaml
+     time:
+       # - platform: homeassistant
+       #   id: current_time
+
+       - platform: sntp
+         id: current_time
+         timezone: "America/Los_Angeles"  # Change to your timezone
+     ```
+
+   - **External component**: Comment out the `local` source and uncomment the `git` source:
+     ```yaml
+     external_components:
+       # - source:
+       #     type: local
+       #     path: /config/esphome/external_components
+       #   components: [ e2271ks0c1 ]
+
+       - source:
+           type: git
+           url: https://github.com/usetrmnl/esphome-e2271ks0c1
+         components: [ e2271ks0c1 ]
+     ```
+
+   - **API component**: Optionally remove the `api:` line if you don't need remote API access.
+
+4. **Create a secrets file**
+
+   Create a `secrets.yaml` file in the same directory:
+   ```yaml
+   wifi_ssid: "your-wifi-name"
+   wifi_password: "your-wifi-password"
+   ```
+
+5. **Compile and upload**
+
+   ```bash
+   esphome run bitclock.yaml
+   ```
 
 ## Configuration Options
 
@@ -39,7 +121,7 @@ Replace `your-homeassistant.local` with your Home Assistant hostname or IP addre
 
 See [bitclock.example.yaml](https://github.com/gxlabs/esphome-e2271ks0c1/blob/main/bitclock.example.yaml) for a complete example with:
 - Time display (12h/24h configurable)
-- WiFi status icon
+- WiFi signal strength icon
 - CO2, temperature, humidity, and VOC sensor readings
 - Material Design Icons
 - Dark mode toggle

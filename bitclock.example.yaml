@@ -24,6 +24,7 @@ logger:
   logs:
     e2271ks0c1: DEBUG
 
+# Home Assistant API (remove if using standalone ESPHome)
 api:
 
 ota:
@@ -41,17 +42,17 @@ captive_portal:
 
 # -------------------
 # Time
-#  Note: If you're not using Home Assistant, uncomment the following to change the time platform to sntp:
-#
-#  time:
-#    - platform: sntp
-#      id: homeassistant_time
-#      timezone: "America/Los_Angeles"  # your timezone
+#   Home Assistant: Uses HA time (default below)
+#   Standalone: Comment out homeassistant platform and uncomment sntp platform
 # -------------------
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
+    id: current_time
+
+  # - platform: sntp
+  #   id: current_time
+  #   timezone: "America/Los_Angeles"  # Change to your timezone
 
 # -------------------
 # I2C (Bitclock PCB)
@@ -88,8 +89,15 @@ sensor:
       name: "NOx Index"
       id: nox
 
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_signal_db
+    update_interval: 60s
+
 # -------------------
 # External E-Ink Driver
+#   Home Assistant: Copy external_components folder to /config/esphome/ and use local path (default below)
+#   Standalone: Comment out local source and uncomment git source
 # -------------------
 
 external_components:
@@ -97,6 +105,11 @@ external_components:
       type: local
       path: /config/esphome/external_components
     components: [ e2271ks0c1 ]
+
+  # - source:
+  #     type: git
+  #     url: https://github.com/usetrmnl/esphome-e2271ks0c1
+  #   components: [ e2271ks0c1 ]
 
 spi:
   clk_pin: GPIO6
@@ -116,7 +129,7 @@ display:
     data_rate: 4MHz
     rotation: 0
     update_interval: 10s
-    full_update_every: 100   # Full refresh every 100 updates (16 min) to clear ghosting
+    full_update_every: 20
     temperature_c: 25
 
     lambda: |-
@@ -133,7 +146,7 @@ display:
       it.fill(bg);
 
       // --- Top bar: Time (left) and WiFi (right) ---
-      auto time = id(homeassistant_time).now();
+      auto time = id(current_time).now();
       if (time.is_valid()) {
         if (${time_24h}) {
           it.strftime(8, 6, id(font_time), fg, "%H:%M", time);
@@ -144,11 +157,20 @@ display:
         it.print(8, 6, id(font_time), fg, "--:--");
       }
 
-      // WiFi status icon (top right)
+      // WiFi strength icon (top right)
       if (wifi::global_wifi_component->is_connected()) {
-        it.print(w - 28, 8, id(font_icons), fg, "\U000F05A9");  // wifi
+        float rssi = id(wifi_signal_db).state;
+        if (rssi >= -50) {
+          it.print(w - 28, 8, id(font_icons), fg, "\U000F0928");  // wifi-strength-4
+        } else if (rssi >= -60) {
+          it.print(w - 28, 8, id(font_icons), fg, "\U000F0925");  // wifi-strength-3
+        } else if (rssi >= -70) {
+          it.print(w - 28, 8, id(font_icons), fg, "\U000F0922");  // wifi-strength-2
+        } else {
+          it.print(w - 28, 8, id(font_icons), fg, "\U000F091F");  // wifi-strength-1
+        }
       } else {
-        it.print(w - 28, 8, id(font_icons), fg, "\U000F05AA");  // wifi-off
+        it.print(w - 28, 8, id(font_icons), fg, "\U000F092B");  // wifi-strength-off
       }
 
       // --- Divider line ---
@@ -160,16 +182,17 @@ display:
       int row1 = 54;
       int row2 = 110;
       int text_offset = 28;
-      int value_offset = 18;
+      int value_y_offset = 17;
+      int value_x_offset = 4;
       int icon_y_offset = -5;  // Move icons up to align top with label
 
       // CO2 (top left)
       it.print(col1, row1 + icon_y_offset, id(font_icons), fg, "\U000F07E4");  // molecule-co2
       it.print(col1 + text_offset, row1, id(font_label), fg, "CO2");
       if (!isnan(id(co2).state)) {
-        it.printf(col1, row1 + value_offset, id(font_value), fg, "%.0f ppm", id(co2).state);
+        it.printf(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "%.0f ppm", id(co2).state);
       } else {
-        it.print(col1, row1 + value_offset, id(font_value), fg, "--");
+        it.print(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
 
       // Temperature (top right)
@@ -178,27 +201,27 @@ display:
       if (!isnan(id(temperature).state)) {
         bool use_f = ${temp_fahrenheit};
         float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
-        it.printf(col2, row1 + value_offset, id(font_value), fg, use_f ? "%.1f °F" : "%.1f °C", temp);
+        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.1f °F" : "%.1f °C", temp);
       } else {
-        it.print(col2, row1 + value_offset, id(font_value), fg, "--");
+        it.print(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
 
       // Humidity (bottom left)
       it.print(col1, row2 + icon_y_offset, id(font_icons), fg, "\U000F058E");  // water-percent
       it.print(col1 + text_offset, row2, id(font_label), fg, "HUMIDITY");
       if (!isnan(id(humidity).state)) {
-        it.printf(col1, row2 + value_offset, id(font_value), fg, "%.0f %%", id(humidity).state);
+        it.printf(col1 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f %%", id(humidity).state);
       } else {
-        it.print(col1, row2 + value_offset, id(font_value), fg, "--");
+        it.print(col1 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "--");
       }
 
       // VOC (bottom right)
       it.print(col2, row2 + icon_y_offset, id(font_icons), fg, "\U000F0D43");  // air-purifier
       it.print(col2 + text_offset, row2, id(font_label), fg, "VOC");
       if (!isnan(id(voc).state)) {
-        it.printf(col2, row2 + value_offset, id(font_value), fg, "%.0f idx", id(voc).state);
+        it.printf(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f idx", id(voc).state);
       } else {
-        it.print(col2, row2 + value_offset, id(font_value), fg, "--");
+        it.print(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "--");
       }
 
 # -------------------
@@ -229,8 +252,11 @@ font:
     id: font_icons
     size: 24
     glyphs:
-      - "\U000F05A9"  # mdi:wifi
-      - "\U000F05AA"  # mdi:wifi-off
+      - "\U000F091F"  # mdi:wifi-strength-1
+      - "\U000F0922"  # mdi:wifi-strength-2
+      - "\U000F0925"  # mdi:wifi-strength-3
+      - "\U000F0928"  # mdi:wifi-strength-4
+      - "\U000F092B"  # mdi:wifi-strength-off
       - "\U000F07E4"  # mdi:molecule-co2
       - "\U000F050F"  # mdi:thermometer
       - "\U000F058E"  # mdi:water-percent
