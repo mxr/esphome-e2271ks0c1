@@ -25,10 +25,10 @@ Use this method if you're running ESPHome as a Home Assistant add-on.
 
 2. **Copy the external component to Home Assistant**
 
-   Copy the `external_components` folder to your Home Assistant config directory:
+   Copy the `components` folder to your Home Assistant config directory as `external_components`:
 
    ```bash
-   scp -r external_components your-homeassistant.local:/config/esphome/
+   scp -r components/* your-homeassistant.local:/config/esphome/external_components
    ```
 
    Replace `your-homeassistant.local` with your Home Assistant hostname or IP address.
@@ -84,7 +84,7 @@ Use this method if you're running ESPHome directly on your computer without Home
 
        - source:
            type: git
-           url: https://github.com/usetrmnl/esphome-e2271ks0c1
+           url: https://github.com/gxlabs/esphome-e2271ks0c1
          components: [ e2271ks0c1 ]
      ```
 
