@@ -14,55 +14,44 @@ static inline uint8_t encode_temp_tsset(float temp_c, bool fast) {
   return ts;
 }
 
-bool E2271KS0C1::transfer_data() {
-  ESP_LOGD(TAG, "transfer_data() starting");
-
-  // Clear to white, then let the writer (lambda) draw
-  this->fill(display::COLOR_OFF);
-
-  // Try to call the display writer/lambda directly
-  if (this->writer_.has_value()) {
-    ESP_LOGD(TAG, "Calling display writer lambda");
-    (*this->writer_)(*this);
-  } else {
-    ESP_LOGW(TAG, "No display writer configured");
+bool E2271KS0C1::reset() {
+  // Hardware reset: double-toggle sequence per datasheet
+  // Only do full reset on first update; skip on subsequent updates
+  if (this->reset_pin_ == nullptr) {
+    return true;
   }
 
-  // Count what's in the buffer
-  size_t non_zero = 0;
-  for (size_t i = 0; i < this->buffer_length_; i++) {
-    if (this->buffer_[i] != 0x00) non_zero++;
-  }
-  ESP_LOGI(TAG, "Buffer has %zu non-zero bytes (shapes drawn)", non_zero);
-
-  // Determine if this is a fast (partial) update or full update
-  // Full update on first frame and every full_update_every_ frames
-  const bool full_update = (this->update_count_ == 0) ||
-                           (this->full_update_every_ > 0 && (this->update_count_ % this->full_update_every_) == 0);
-  const bool fast = !full_update;
-  ESP_LOGD(TAG, "Update mode: %s (count=%u, full_every=%u)", fast ? "FAST" : "FULL", this->update_count_, this->full_update_every_);
-
-  // Hardware reset on first call only
   if (!this->initialized_) {
-    if (this->reset_pin_ != nullptr) {
-      ESP_LOGD(TAG, "Hardware reset sequence");
-      this->reset_pin_->digital_write(false);
-      delay(50);
-      this->reset_pin_->digital_write(true);
-      delay(50);
-      this->reset_pin_->digital_write(false);
-      delay(50);
-      this->reset_pin_->digital_write(true);
-      delay(50);
-    }
-    this->wait_for_idle_(true);
+    ESP_LOGD(TAG, "Hardware reset sequence (first update)");
+    this->reset_pin_->digital_write(false);
+    delay(50);
+    this->reset_pin_->digital_write(true);
+    delay(50);
+    this->reset_pin_->digital_write(false);
+    delay(50);
+    this->reset_pin_->digital_write(true);
+    delay(50);
     this->initialized_ = true;
   }
 
+  return true;
+}
+
+bool E2271KS0C1::transfer_data() {
+  ESP_LOGD(TAG, "transfer_data() starting");
+
+  // Determine if this is a fast (partial) update or full update
+  // update_count_ == 0 means full update, otherwise partial
+  // (base class manages update_count_ and increments after refresh_screen)
+  const bool partial = this->update_count_ != 0;
+  const bool fast = partial;
+  ESP_LOGD(TAG, "Update mode: %s (count=%u, full_every=%u)",
+           fast ? "FAST" : "FULL", this->update_count_, this->full_update_every_);
+
   // Soft reset only on full updates (causes flash if done every time)
-  if (full_update) {
+  if (!partial) {
     uint8_t reset_data = 0x0E;
-    this->cmd_data(0x00, &reset_data, 1);
+    this->cmd_data(ADDR_PSR, &reset_data, 1);
     delay(50);
   }
 
@@ -84,7 +73,7 @@ bool E2271KS0C1::transfer_data() {
   // Clear tx buffer to white (0 = white on panel)
   std::fill(this->tx_.begin(), this->tx_.end(), 0x00);
 
-  // Rotate and copy pixels
+  // Rotate and copy pixels from ESPHome buffer to panel format
   // COLOR_ON (1 in buffer) = black on screen
   // COLOR_OFF (0 in buffer) = white on screen
   for (int sy = 0; sy < src_height; sy++) {
@@ -102,7 +91,7 @@ bool E2271KS0C1::transfer_data() {
       int dst_byte = dy * (dst_width / 8) + dx / 8;
       int dst_bit = 7 - (dx % 8);
       if (pixel_on) {
-        this->tx_[dst_byte] |= (1 << dst_bit);  // Set bit = black on panel
+        this->tx_[dst_byte] |= (1 << dst_bit);
       }
     }
   }
@@ -114,10 +103,15 @@ bool E2271KS0C1::transfer_data() {
   uint8_t at = 0x02;
   this->cmd_data(ADDR_ACTIVE_TEMP, &at, 1);
 
-  // PSR (Panel Settings Register)
+  // PSR (Panel Settings Register) - different settings for fast vs full update
   if (fast) {
+    // Set border to white before fast update
+    uint8_t border_setting = 0x27;
+    this->cmd_data(ADDR_VCOM_CDI, &border_setting, 1);
+    // PSR with fast update flags
     uint8_t fast_psr[2] = {static_cast<uint8_t>(psr_[0] | 0x10), static_cast<uint8_t>(psr_[1] | 0x02)};
     this->cmd_data(ADDR_PSR, fast_psr, 2);
+    // VCOM setting for fast update
     uint8_t vcom_setting = 0x07;
     this->cmd_data(ADDR_VCOM_CDI, &vcom_setting, 1);
   } else {
@@ -140,49 +134,38 @@ bool E2271KS0C1::transfer_data() {
   }
   this->end_data_();
 
-  // Power on, refresh, power off sequence
-  this->wait_for_idle_(true);
-
-  this->command(ADDR_PWR_ON);
-  this->wait_for_idle_(true);
-
-  this->command(ADDR_REFRESH);
-  this->wait_for_idle_(true);
-
-  this->command(ADDR_PWR_OFF);
-  this->wait_for_idle_(true);
-
-  // Store current frame for next fast update comparison
-  // After a full update, prev_ should match what's on screen
-  this->prev_ = this->tx_;
-
-  // Increment update counter
-  this->update_count_++;
-
-  ESP_LOGD(TAG, "Display update complete");
-  return true;
-}
-
-bool E2271KS0C1::reset() {
-  // We handle hardware reset in transfer_data() on first call only
+  ESP_LOGD(TAG, "transfer_data() complete");
   return true;
 }
 
 void E2271KS0C1::power_on() {
-  // handled in transfer_data
+  ESP_LOGD(TAG, "power_on()");
+  // Send power on command (twice per datasheet)
+  this->command(ADDR_PWR_ON);
+  this->command(ADDR_PWR_ON);
 }
 
-void E2271KS0C1::refresh_screen(bool /*partial*/) {
-  // handled in transfer_data
+void E2271KS0C1::refresh_screen(bool partial) {
+  ESP_LOGD(TAG, "refresh_screen(partial=%s)", partial ? "true" : "false");
+  // Send refresh command (twice per datasheet)
+  this->command(ADDR_REFRESH);
+  this->command(ADDR_REFRESH);
+
+  // Store current frame for next fast update
+  this->prev_ = this->tx_;
 }
 
 void E2271KS0C1::power_off() {
-  // handled in transfer_data
+  ESP_LOGD(TAG, "power_off()");
+  // Send power off command (twice per datasheet)
+  this->command(ADDR_PWR_OFF);
+  this->command(ADDR_PWR_OFF);
 }
 
 void E2271KS0C1::deep_sleep() {
-  // no deep sleep command in your working flow; just leave idle
-  ESP_LOGD(TAG, "Update done");
+  // Optional: enter deep sleep mode for minimum power consumption
+  // For now, just log completion - display is already powered off
+  ESP_LOGD(TAG, "deep_sleep() - update cycle complete");
 }
 
 }  // namespace e2271ks0c1
