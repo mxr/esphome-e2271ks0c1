@@ -15,6 +15,9 @@ class E2271KS0C1 : public epaper_spi::EPaperBase {
 
   void set_temperature_c(float t) { temperature_c_ = t; }
 
+  // Force next update to be a full refresh (useful when changing dark mode, etc.)
+  void force_full_update() { this->update_count_ = 0; }
+
   // EPaperBase hooks
   bool reset() override;  // Override to control reset timing
   bool transfer_data() override;

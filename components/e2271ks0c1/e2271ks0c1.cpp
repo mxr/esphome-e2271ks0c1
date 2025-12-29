@@ -105,34 +105,45 @@ bool E2271KS0C1::transfer_data() {
 
   // PSR (Panel Settings Register) - different settings for fast vs full update
   if (fast) {
-    // Set border to white before fast update
-    uint8_t border_setting = 0x27;
-    this->cmd_data(ADDR_VCOM_CDI, &border_setting, 1);
     // PSR with fast update flags
     uint8_t fast_psr[2] = {static_cast<uint8_t>(psr_[0] | 0x10), static_cast<uint8_t>(psr_[1] | 0x02)};
     this->cmd_data(ADDR_PSR, fast_psr, 2);
-    // VCOM setting for fast update
+
+    // Set border to white BEFORE frame data (send twice per datasheet)
+    uint8_t border_setting = 0x27;
+    this->cmd_data(ADDR_VCOM_CDI, &border_setting, 1);
+    this->cmd_data(ADDR_VCOM_CDI, &border_setting, 1);
+
+    // Fast update: Frame 1 = PREVIOUS image, Frame 2 = NEW image
+    this->command(ADDR_FRAME1);
+    this->start_data_();
+    this->write_array(this->prev_.data(), n);
+    this->end_data_();
+
+    this->command(ADDR_FRAME2);
+    this->start_data_();
+    this->write_array(this->tx_.data(), n);
+    this->end_data_();
+
+    // Set CDI AFTER frame data (send twice per datasheet)
     uint8_t vcom_setting = 0x07;
     this->cmd_data(ADDR_VCOM_CDI, &vcom_setting, 1);
+    this->cmd_data(ADDR_VCOM_CDI, &vcom_setting, 1);
   } else {
+    // Normal/full update
     this->cmd_data(ADDR_PSR, psr_, 2);
-  }
 
-  // Send image data - Frame 1 (new image)
-  this->command(ADDR_FRAME1);
-  this->start_data_();
-  this->write_array(this->tx_.data(), n);
-  this->end_data_();
+    // Full update: Frame 1 = NEW image, Frame 2 = zeros
+    this->command(ADDR_FRAME1);
+    this->start_data_();
+    this->write_array(this->tx_.data(), n);
+    this->end_data_();
 
-  // Frame 2: previous frame for fast update, zeros for full update
-  this->command(ADDR_FRAME2);
-  this->start_data_();
-  if (fast && this->prev_.size() == n) {
-    this->write_array(this->prev_.data(), n);
-  } else {
+    this->command(ADDR_FRAME2);
+    this->start_data_();
     for (size_t i = 0; i < n; i++) this->write_byte(0x00);
+    this->end_data_();
   }
-  this->end_data_();
 
   ESP_LOGD(TAG, "transfer_data() complete");
   return true;
