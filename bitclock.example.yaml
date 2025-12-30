@@ -39,6 +39,7 @@ ota:
 
 web_server:
   port: 80
+  version: 3
 
 # -------------------
 # Persistent settings (survives reboot)
@@ -356,20 +357,24 @@ display:
       // Clear to background color
       it.fill(bg);
 
+      int datetime_x = 12;
+      int date_y = 4;
+      int time_y = 19;
+
       // --- Top bar: Date, Time (left) and WiFi (right) ---
       auto time = id(current_time).now();
       if (time.is_valid()) {
         // Date on top line
-        it.strftime(12, 4, id(font_date), fg, "%a, %b %d", time);
+        it.strftime(datetime_x, date_y, id(font_datetime), fg, "%a, %b %d", time);
         // Time below
         if (id(time_24h)) {
-          it.strftime(8, 19, id(font_time), fg, "%H:%M", time);
+          it.strftime(datetime_x, time_y, id(font_datetime), fg, "%H:%M", time);
         } else {
-          it.strftime(8, 19, id(font_time), fg, "%l:%M%P", time);
+          it.strftime(datetime_x, time_y, id(font_datetime), fg, "%l:%M%P", time);
         }
       } else {
-        it.print(12, 4, id(font_date), fg, "---");
-        it.print(8, 19, id(font_time), fg, "--:--");
+        it.print(datetime_x, date_y, id(font_datetime), fg, "---");
+        it.print(datetime_x, time_y, id(font_datetime), fg, "--:--");
       }
 
       // WiFi strength icon (top right, vertically centered)
@@ -392,60 +397,54 @@ display:
       int col2 = w / 2 + 6;
       int row1 = 54;
       int row2 = 110;
-      int text_offset = 28;
+      int text_offset = 24;
       int value_y_offset = 17;
       int value_x_offset = 4;
       int icon_y_offset = -5;  // Move icons up to align top with label
-      int trend_x = 115;       // X position for trend icon (right side of value)
 
-      // Trend icons: up = \U000F05D5, down = \U000F05D7
-      auto show_trend = [&](int x, int y, float current, float previous, float threshold) {
-        if (isnan(previous) || isnan(current)) return;
-        if (current > previous + threshold) {
-          it.print(x, y, id(font_trend), fg, "\U000F05D5");  // trending-up
-        } else if (current < previous - threshold) {
-          it.print(x, y, id(font_trend), fg, "\U000F05D7");  // trending-down
-        }
+      // Trend icons: up = \U000F09C4, down = \U000F09C1
+      // Returns trend icon string (empty if no significant change)
+      auto get_trend = [&](float current, float previous, float threshold) -> const char* {
+        if (isnan(previous) || isnan(current)) return "";
+        if (current > previous + threshold) return "\U000F09C4";  // arrow-top-right-thick
+        if (current < previous - threshold) return "\U000F09C1";  // arrow-bottom-right-thick
+        return "";
       };
 
-      // CO2 (top left)
-      it.print(col1, row1 + icon_y_offset, id(font_icons), fg, "\U000F07E4");  // molecule-co2
-      it.print(col1 + text_offset, row1, id(font_label), fg, "CO2");
-      if (!isnan(id(co2).state)) {
-        it.printf(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "%.0f ppm", id(co2).state);
-        show_trend(trend_x, row1 + value_y_offset + 4, id(co2).state, id(prev_co2), 20.0f);
+      // Temperature (top left)
+      it.print(col1, row1 + icon_y_offset, id(font_icons), fg, "\U000F050F");  // thermometer
+      it.printf(col1 + text_offset, row1, id(font_label), fg, "TEMP %s", get_trend(id(temperature).state, id(prev_temperature), 0.3f));
+      if (!isnan(id(temperature).state)) {
+        bool use_f = id(temp_fahrenheit);
+        float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
+        it.printf(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.0f°f" : "%.0f°c", temp);
       } else {
         it.print(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
 
-      // Temperature (top right)
-      it.print(col2, row1 + icon_y_offset, id(font_icons), fg, "\U000F050F");  // thermometer
-      it.print(col2 + text_offset, row1, id(font_label), fg, "TEMP");
-      if (!isnan(id(temperature).state)) {
-        bool use_f = id(temp_fahrenheit);
-        float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
-        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.1f F" : "%.1f C", temp);
-        show_trend(col2 + trend_x, row1 + value_y_offset + 4, id(temperature).state, id(prev_temperature), 0.3f);
+      // CO2 (top right)
+      it.print(col2, row1 + icon_y_offset, id(font_icons), fg, "\U000F07E4");  // molecule-co2
+      it.printf(col2 + text_offset, row1, id(font_label), fg, "CO2 %s", get_trend(id(co2).state, id(prev_co2), 20.0f));
+      if (!isnan(id(co2).state)) {
+        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "%.0fppm", id(co2).state);
       } else {
         it.print(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
 
       // Humidity (bottom left)
       it.print(col1, row2 + icon_y_offset, id(font_icons), fg, "\U000F058E");  // water-percent
-      it.print(col1 + text_offset, row2, id(font_label), fg, "HUMIDITY");
+      it.printf(col1 + text_offset, row2, id(font_label), fg, "HUMIDITY %s", get_trend(id(humidity).state, id(prev_humidity), 2.0f));
       if (!isnan(id(humidity).state)) {
-        it.printf(col1 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f %%", id(humidity).state);
-        show_trend(trend_x, row2 + value_y_offset + 4, id(humidity).state, id(prev_humidity), 2.0f);
+        it.printf(col1 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f%%", id(humidity).state);
       } else {
         it.print(col1 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "--");
       }
 
       // VOC (bottom right)
       it.print(col2, row2 + icon_y_offset, id(font_icons), fg, "\U000F0D43");  // air-purifier
-      it.print(col2 + text_offset, row2, id(font_label), fg, "VOC");
+      it.printf(col2 + text_offset, row2, id(font_label), fg, "VOC %s", get_trend(id(voc).state, id(prev_voc), 5.0f));
       if (!isnan(id(voc).state)) {
-        it.printf(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f idx", id(voc).state);
-        show_trend(col2 + trend_x, row2 + value_y_offset + 4, id(voc).state, id(prev_voc), 5.0f);
+        it.printf(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0fidx", id(voc).state);
       } else {
         it.print(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "--");
       }
@@ -455,29 +454,28 @@ display:
 # -------------------
 
 font:
-  # Date display
+  # Date/time display
   - file: "gfonts://Roboto@500"
-    id: font_date
+    id: font_datetime
     size: 18
-    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789, -"
-
-  # Time display - bold
-  - file: "gfonts://Roboto@700"
-    id: font_time
-    size: 22
-    glyphs: "0123456789:- amp"
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789, -:"
 
   # Value display - numbers and units
   - file: "gfonts://Roboto@500"
     id: font_value
     size: 24
-    glyphs: "0123456789.- %CFABcdefghijklmnopqrstuvwxyz"
+    glyphs: "0123456789.- %CFABcdefghijklmnopqrstuvwxyz°"
 
   # Labels
   - file: "gfonts://Roboto@500"
     id: font_label
-    size: 14
+    size: 18
     glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /:."
+    extras:
+      - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
+        glyphs:
+          - "\U000F09C4"  # mdi:arrow-top-right-thick
+          - "\U000F09C1"  # mdi:arrow-bottom-right-thick
 
   # Material Design Icons
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
@@ -493,13 +491,13 @@ font:
       - "\U000F050F"  # mdi:thermometer
       - "\U000F058E"  # mdi:water-percent
       - "\U000F0D43"  # mdi:air-purifier
-      - "\U000F05D5"  # mdi:trending-up
-      - "\U000F05D7"  # mdi:trending-down
+      - "\U000F09C4"  # mdi:arrow-top-right-thick
+      - "\U000F09C1"  # mdi:arrow-bottom-right-thick
 
   # Smaller trend icons
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
     id: font_trend
     size: 16
     glyphs:
-      - "\U000F05D5"  # mdi:trending-up
-      - "\U000F05D7"  # mdi:trending-down
+      - "\U000F09C4"  # mdi:arrow-top-right-thick
+      - "\U000F09C1"  # mdi:arrow-bottom-right-thick
