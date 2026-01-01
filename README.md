@@ -123,6 +123,7 @@ See [bitclock.example.yaml](https://github.com/gxlabs/esphome-e2271ks0c1/blob/ma
 - Time display (12h/24h configurable)
 - WiFi signal strength icon
 - CO2, temperature, humidity, and VOC sensor readings
+- Toggleable sensor labels (icons-only mode)
 - Material Design Icons
 - Dark mode toggle
 
@@ -141,6 +142,8 @@ substitutions:
   time_24h: "false"       # 12-hour time format
   temp_fahrenheit: "true" # Temperature in Fahrenheit
 ```
+
+To hide the TEMP/CO2/HUMIDITY/VOC text labels and show only the icons (and values), set `show_sensor_labels` to `false` in `bitclock.example.yaml` or toggle the "Show Sensor Labels" switch in Home Assistant.
 
 ## Hardware
 
