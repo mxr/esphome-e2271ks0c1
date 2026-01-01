@@ -9,6 +9,12 @@ esphome:
     then:
       - script.execute: wifi_setup_check
 
+substitutions:
+  dark_mode: "true"           # White text on black background
+  time_24h: "false"           # 12-hour time format
+  temp_fahrenheit: "true"     # Temperature in Fahrenheit
+  show_sensor_labels: "true"  # Show TEMP/CO2/HUMIDITY/VOC labels
+
 # Home Assistant API (comment out if using standalone ESPHome)
 # Sync settings from Home Assistant on connect (survives reflash)
 api:
@@ -49,19 +55,19 @@ globals:
   - id: dark_mode
     type: bool
     restore_value: true
-    initial_value: 'true'
+    initial_value: '${dark_mode}'
   - id: temp_fahrenheit
     type: bool
     restore_value: true
-    initial_value: 'true'
+    initial_value: '${temp_fahrenheit}'
   - id: time_24h
     type: bool
     restore_value: true
-    initial_value: 'false'
+    initial_value: '${time_24h}'
   - id: show_sensor_labels
     type: bool
     restore_value: true
-    initial_value: 'true'
+    initial_value: '${show_sensor_labels}'
   - id: show_setup_screen
     type: bool
     initial_value: 'false'

@@ -138,12 +138,11 @@ The example uses substitutions for easy configuration:
 
 ```yaml
 substitutions:
-  dark_mode: "true"       # White text on black background
-  time_24h: "false"       # 12-hour time format
-  temp_fahrenheit: "true" # Temperature in Fahrenheit
+  dark_mode: "true"           # White text on black background
+  time_24h: "false"           # 12-hour time format
+  temp_fahrenheit: "true"     # Temperature in Fahrenheit
+  show_sensor_labels: "true"  # Show TEMP/CO2/HUMIDITY/VOC labels
 ```
-
-To hide the TEMP/CO2/HUMIDITY/VOC text labels and show only the icons (and values), set `show_sensor_labels` to `false` in `bitclock.example.yaml` or toggle the "Show Sensor Labels" switch in Home Assistant.
 
 ## Hardware
 
