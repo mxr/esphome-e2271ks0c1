@@ -429,9 +429,9 @@ display:
       int row2 = 110;
       bool show_labels = id(show_sensor_labels);
       int text_offset = 24;
-      int value_y_offset = show_labels ? 17 : 8;
+      int value_y_offset = 17;
       int value_x_offset = 4;
-      int icon_y_offset = show_labels ? -5 : 0;  // Move icons up to align top with label
+      int icon_y_offset = -5;
 
       // Trend icons: up = \U000F09C4, down = \U000F09C1
       // Returns trend icon string (empty if no significant change)
@@ -451,7 +451,7 @@ display:
       if (!isnan(id(temperature).state)) {
         bool use_f = id(temp_fahrenheit);
         float temp = use_f ? (id(temperature).state * 9.0f / 5.0f) + 32.0f : id(temperature).state;
-        it.printf(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.0f°f" : "%.0f°c", temp);
+        it.printf(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, use_f ? "%.0f°F" : "%.0f°C", temp);
       } else {
         it.print(col1 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
