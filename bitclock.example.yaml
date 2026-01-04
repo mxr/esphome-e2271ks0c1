@@ -388,23 +388,22 @@ display:
       it.fill(bg);
 
       int datetime_x = 12;
-      int date_y = 4;
-      int time_y = 19;
+      int date_y = 8;
+      int time_x = w - 36;
 
-      // --- Top bar: Date, Time (left) and WiFi (right) ---
+      // --- Top bar: Date (left), Time (right), WiFi (right) ---
       auto time = id(current_time).now();
       if (time.is_valid()) {
-        // Date on top line
+        // Date and time on the same line
         it.strftime(datetime_x, date_y, id(font_datetime), fg, "%a, %b %d", time);
-        // Time below
         if (id(time_24h)) {
-          it.strftime(datetime_x, time_y, id(font_datetime), fg, "%H:%M", time);
+          it.strftime(time_x, date_y, id(font_datetime), fg, TextAlign::TOP_RIGHT, "%H:%M", time);
         } else {
-          it.strftime(datetime_x, time_y, id(font_datetime), fg, "%l:%M%P", time);
+          it.strftime(time_x, date_y, id(font_datetime), fg, TextAlign::TOP_RIGHT, "%l:%M%P", time);
         }
       } else {
         it.print(datetime_x, date_y, id(font_datetime), fg, "---");
-        it.print(datetime_x, time_y, id(font_datetime), fg, "--:--");
+        it.print(time_x, date_y, id(font_datetime), fg, TextAlign::TOP_RIGHT, "--:--");
       }
 
       // WiFi strength icon (top right, vertically centered)
@@ -463,7 +462,7 @@ display:
                   get_trend(id(co2).state, id(prev_co2), 20.0f));
       }
       if (!isnan(id(co2).state)) {
-        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "%.0fppm", id(co2).state);
+        it.printf(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "%.0f ppm", id(co2).state);
       } else {
         it.print(col2 + value_x_offset, row1 + value_y_offset, id(font_value), fg, "--");
       }
@@ -487,7 +486,7 @@ display:
                   get_trend(id(voc).state, id(prev_voc), 5.0f));
       }
       if (!isnan(id(voc).state)) {
-        it.printf(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0fidx", id(voc).state);
+        it.printf(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "%.0f idx", id(voc).state);
       } else {
         it.print(col2 + value_x_offset, row2 + value_y_offset, id(font_value), fg, "--");
       }
@@ -500,7 +499,7 @@ font:
   # Date/time display
   - file: "gfonts://Roboto@500"
     id: font_datetime
-    size: 18
+    size: 24
     glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789, -:"
 
   # Value display - numbers and units
